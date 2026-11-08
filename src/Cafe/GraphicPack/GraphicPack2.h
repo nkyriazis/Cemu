@@ -256,6 +256,8 @@ private:
 	std::vector<TextureRule> m_texture_rules;
 	std::string m_output_shader_source, m_upscaling_shader_source, m_downscaling_shader_source;
 	std::unique_ptr<RendererOutputShader> m_output_shader, m_upscaling_shader, m_downscaling_shader, m_output_shader_ud, m_upscaling_shader_ud, m_downscaling_shader_ud;
+	bool m_output_shader_failed = false, m_upscaling_shader_failed = false, m_downscaling_shader_failed = false; // set if compilation failed, to avoid retrying every frame
+	RendererOutputShader* GetOrCreateOutputShader(std::unique_ptr<RendererOutputShader>& shader, const std::string& source, bool& compileFailed, bool render_upside_down, const char* shaderFileName);
 
 	std::unordered_map<std::string, PresetVar> ParsePresetVars(IniParser& rules) const;
 

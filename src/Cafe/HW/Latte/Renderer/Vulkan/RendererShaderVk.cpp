@@ -426,7 +426,7 @@ bool RendererShaderVk::IsCompiled()
 bool RendererShaderVk::WaitForCompiled()
 {
 	m_compilationState.waitUntilValue(COMPILATION_STATE::DONE);
-	return true;
+	return m_shader_module != VK_NULL_HANDLE; // null if compilation failed
 }
 
 void RendererShaderVk::ShaderCacheLoading_begin(uint64 cacheTitleId)
