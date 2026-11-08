@@ -1120,6 +1120,9 @@ bool GraphicPack2::Deactivate()
 	m_output_shader_source.clear();
 	m_upscaling_shader_source.clear();
 	m_downscaling_shader_source.clear();
+	m_output_shader_failed = false;
+	m_upscaling_shader_failed = false;
+	m_downscaling_shader_failed = false;
 
 	if (HasCustomVSyncFrequency())
 	{
@@ -1174,76 +1177,56 @@ bool GraphicPack2::HasShaders() const
 	|| !m_output_shader_source.empty() || !m_upscaling_shader_source.empty() || !m_downscaling_shader_source.empty();
 }
 
+RendererOutputShader* GraphicPack2::GetOrCreateOutputShader(std::unique_ptr<RendererOutputShader>& shader, const std::string& source, bool& compileFailed, bool render_upside_down, const char* shaderFileName)
+{
+	if (shader)
+		return shader.get();
+	if (source.empty() || compileFailed)
+		return nullptr;
+
+	// output shaders from graphic packs are GLSL and need the vertex shader matching the active backend
+	std::string vertexSource;
+	switch (g_renderer->GetType())
+	{
+	case RendererAPI::OpenGL:
+		vertexSource = RendererOutputShader::GetOpenGlVertexSource(render_upside_down);
+		break;
+	case RendererAPI::Vulkan:
+		vertexSource = RendererOutputShader::GetVulkanVertexSource(render_upside_down);
+		break;
+	default:
+		cemuLog_log(LogType::Force, "Graphic pack \"{}\": {} is not supported with the current graphics API and will be ignored", GetName(), shaderFileName);
+		compileFailed = true;
+		return nullptr;
+	}
+
+	try
+	{
+		shader = std::make_unique<RendererOutputShader>(vertexSource, source);
+	}
+	catch (const std::exception&)
+	{
+		cemuLog_log(LogType::Force, "Graphic pack \"{}\": Failed to compile {}. Using the default output filter instead", GetName(), shaderFileName);
+		shader.reset();
+		compileFailed = true;
+		return nullptr;
+	}
+	return shader.get();
+}
+
 RendererOutputShader* GraphicPack2::GetOuputShader(bool render_upside_down)
 {
-	if(render_upside_down)
-	{
-		if (m_output_shader_ud)
-			return m_output_shader_ud.get();
-
-		if (!m_output_shader_source.empty())
-			m_output_shader_ud = std::make_unique<RendererOutputShader>(RendererOutputShader::GetOpenGlVertexSource(render_upside_down), m_output_shader_source);
-
-		return m_output_shader_ud.get();
-	}
-	else
-	{
-		if (m_output_shader)
-			return m_output_shader.get();
-
-		if (!m_output_shader_source.empty())
-			m_output_shader = std::make_unique<RendererOutputShader>(RendererOutputShader::GetOpenGlVertexSource(render_upside_down), m_output_shader_source);
-
-		return m_output_shader.get();
-	}
+	return GetOrCreateOutputShader(render_upside_down ? m_output_shader_ud : m_output_shader, m_output_shader_source, m_output_shader_failed, render_upside_down, "output.glsl");
 }
 
 RendererOutputShader* GraphicPack2::GetUpscalingShader(bool render_upside_down)
 {
-	if (render_upside_down)
-	{
-		if (m_upscaling_shader_ud)
-			return m_upscaling_shader_ud.get();
-
-		if (!m_upscaling_shader_source.empty())
-			m_upscaling_shader_ud = std::make_unique<RendererOutputShader>(RendererOutputShader::GetOpenGlVertexSource(render_upside_down), m_upscaling_shader_source);
-
-		return m_upscaling_shader_ud.get();
-	}
-	else
-	{
-		if (m_upscaling_shader)
-			return m_upscaling_shader.get();
-
-		if (!m_upscaling_shader_source.empty())
-			m_upscaling_shader = std::make_unique<RendererOutputShader>(RendererOutputShader::GetOpenGlVertexSource(render_upside_down), m_upscaling_shader_source);
-
-		return m_upscaling_shader.get();
-	}
+	return GetOrCreateOutputShader(render_upside_down ? m_upscaling_shader_ud : m_upscaling_shader, m_upscaling_shader_source, m_upscaling_shader_failed, render_upside_down, "upscaling.glsl");
 }
 
 RendererOutputShader* GraphicPack2::GetDownscalingShader(bool render_upside_down)
 {
-	if (render_upside_down)
-	{
-		if (m_downscaling_shader_ud)
-			return m_downscaling_shader_ud.get();
-
-		if (!m_downscaling_shader_source.empty())
-			m_downscaling_shader_ud = std::make_unique<RendererOutputShader>(RendererOutputShader::GetOpenGlVertexSource(render_upside_down), m_downscaling_shader_source);
-
-		return m_downscaling_shader_ud.get();
-	}
-	else
-	{
-		if (m_downscaling_shader)
-			return m_downscaling_shader.get();
-
-		if (!m_downscaling_shader_source.empty())
-			m_downscaling_shader = std::make_unique<RendererOutputShader>(RendererOutputShader::GetOpenGlVertexSource(render_upside_down), m_downscaling_shader_source);
-
-		return m_downscaling_shader.get();
-	}
+	return GetOrCreateOutputShader(render_upside_down ? m_downscaling_shader_ud : m_downscaling_shader, m_downscaling_shader_source, m_downscaling_shader_failed, render_upside_down, "downscaling.glsl");
 }
 
 
